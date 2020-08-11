@@ -14,10 +14,11 @@ import kotlinx.coroutines.channels.ActorScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.actor
 import kotlin.coroutines.CoroutineContext
+import kotlin.system.measureTimeMillis
 
 class MainActivity: AppCompatActivity() {
 
-    var realTime = 1
+    private var realTime = 1
 
     @ObsoleteCoroutinesApi
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,6 +152,7 @@ class MainActivity: AppCompatActivity() {
             }
         }
 
+        //кнопка для отправки сообщения на канал actor
         btnSendToActor.setOnClickListener {
             val textToActor = editTextMessageToActor.text.toString()
             if(textToActor.isEmpty()) {
@@ -167,6 +169,71 @@ class MainActivity: AppCompatActivity() {
             }
         }
 
+        //Кнопка для запуска двух функций в обычном потоке
+        btnStartProcessUsual.setOnClickListener {
+            onClickBtnStartProcessUsual(it)
+        }
+
+        //Кнопка для запуска двух функций в асинхронном режиме
+        btnStartProcessAsync.setOnClickListener {
+            onClickBtnStartProcessAsync(it)
+        }
+
+    }
+
+    //функция для нажатия на кнопку для запуска двух функций в асинхронном режиме
+    private fun onClickBtnStartProcessAsync(btn: View?) {
+        btnStartProcessAsync.visibility = Button.INVISIBLE
+        progressBarStartProcessAsync.visibility = ProgressBar.VISIBLE
+        GlobalScope.launch(Dispatchers.IO) {
+            var result = 0
+            //запускаем таймер времени
+            val time = measureTimeMillis {
+                //запускаем две функции параллельно
+                val one = async { returnOne() }
+                val two = async { returnTwo() }
+                //и получаем ответ тогда, когда обе функции выполнят работу свою
+                result = one.await() + two.await()
+            }
+            withContext(Dispatchers.Main) {
+                btnStartProcessAsync.visibility = Button.VISIBLE
+                progressBarStartProcessAsync.visibility = ProgressBar.INVISIBLE
+                textViewStartProcessAsync.text = "Задача выполнена за $time мс. \n"
+                textViewStartProcessAsync.append("12 + 13 = $result")
+            }
+        }
+    }
+
+    //Функция для нажатия на кнопку для запуска процесса в обычном режиме
+    private fun onClickBtnStartProcessUsual(btn: View?) {
+        btnStartProcessUsual.visibility = Button.INVISIBLE
+        progressBarStartProcessUsual.visibility = ProgressBar.VISIBLE
+        GlobalScope.launch(Dispatchers.IO) {
+            var one = 0
+            var two = 0
+            //засекаем время
+            val time = measureTimeMillis {
+                one = returnOne()
+                two = returnTwo()
+            }
+            //по окончании выходим в главный поток и выводим соообщения
+            withContext(Dispatchers.Main) {
+                textViewStartProcessUsual.text = "Задача выполнена за $time мс. \n"
+                btnStartProcessUsual.visibility = Button.VISIBLE
+                progressBarStartProcessUsual.visibility = ProgressBar.INVISIBLE
+                textViewStartProcessUsual.append("$one + $two = ${one + two}")
+            }
+        }
+    }
+
+    private suspend fun returnTwo(): Int {
+        delay(3000L)
+        return 12
+    }
+
+    private suspend fun returnOne(): Int {
+        delay(2000L)
+        return 13
     }
 
     // Блокируется весь UI поток на time секунд. Стоит отметить, что кнопки все равно можно нажимать
